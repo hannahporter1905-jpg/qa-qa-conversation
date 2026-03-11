@@ -2,3 +2,5 @@ node_modules/
 package-lock.json
 *.pdf
 *.md
+.env
+config.js
