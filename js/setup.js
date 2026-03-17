@@ -144,41 +144,23 @@ function handleFileSelect(input) {
 // ── AI ANALYSIS PLACEHOLDER ───────────────────────────────────────
 
 async function analyzeConversation(conversationText) {
-  let apiKey = localStorage.getItem('openai_api_key');
-
-  if (!apiKey) {
-    apiKey = prompt("Enter your OpenAI API Key for analysis:\n(It will be stored locally in your browser)");
-    if (!apiKey) throw new Error("API Key is required.");
-    localStorage.setItem('openai_api_key', apiKey);
-  }
-
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call our own server-side API endpoint
+    const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: "You are a Customer Support QA Analyst. Analyze the following conversation transcript. Provide a concise summary including:\n1. The core issue.\n2. Resolution status.\n3. Agent performance notes.\n4. Key insights.\n\nFormat the output using clear sections and bullet points." },
-          { role: "user", content: conversationText.substring(0, 25000) } // Truncate to avoid payload limits
-        ],
-        temperature: 0.5
-      })
+      body: JSON.stringify({ text: conversationText })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      if (data.error && data.error.code === 'invalid_api_key') {
-        localStorage.removeItem('openai_api_key');
-      }
-      throw new Error(data.error?.message || 'OpenAI API request failed');
+      throw new Error(data.error || 'Analysis failed');
     }
 
-    return { status: 'success', summary: data.choices[0].message.content };
+    return { status: 'success', summary: data.summary };
   } catch (err) {
     throw err;
   }
