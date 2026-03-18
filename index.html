@@ -19,8 +19,8 @@
     </div>
   </div>
   <div class="hdr-r">
-    <button class="btn btn-g btn-sm" onclick="openAddModal()">＋ Add Question</button>
-    <button class="btn btn-p btn-sm" onclick="exportMD()">↓ Export</button>
+    <button class="btn btn-g btn-sm desktop-only" onclick="openAddModal()">＋ Add Question</button>
+    <button class="btn btn-p btn-sm desktop-only" onclick="exportMD()">↓ Export</button>
     <button class="btn btn-p btn-sm" style="background:var(--accent2)" onclick="openImportModal()">✨ Add Conversation</button>
     <div id="user-display" class="user-display hidden"></div>
   </div>
@@ -178,7 +178,7 @@
     <div class="tabs">
       <button class="tab-btn active" onclick="switchImportTab('upload')">Upload File</button>
       <button class="tab-btn" onclick="switchImportTab('paste')">Paste Text</button>
-      <button class="tab-btn" onclick="switchImportTab('intercom')">Intercom ID</button>
+      <button class="tab-btn" onclick="switchImportTab('intercom')">Conversation ID</button>
     </div>
 
     <div id="tab-upload" class="tab-content active">
@@ -196,8 +196,8 @@
 
     <div id="tab-intercom" class="tab-content">
       <div class="frow">
-        <label class="flbl">Intercom Conversation ID</label>
-        <input type="text" class="finput" id="intercom-id" placeholder="e.g. 1234567890" />
+        <label class="flbl">Conversation ID</label>
+        <input type="text" class="finput" id="intercom-id" placeholder="e.g. Intercom ID (1234567890)" />
       </div>
     </div>
 
