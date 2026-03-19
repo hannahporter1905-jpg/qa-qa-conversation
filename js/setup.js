@@ -238,14 +238,18 @@ function applyAnalysisToDashboard() {
   const id = 'conv-' + Date.now();
   const title = `${analysis.intent || 'General'} — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
+  // Capture original text for future re-analysis
+  const pasteText = document.getElementById('import-text')?.value?.trim() || '';
+
   const conv = {
     id,
     title,
-    sentiment:   analysis.sentiment  || 'Neutral',
-    intent:      analysis.intent     || 'General',
-    summary:     analysis.summary    || '',
-    intercom_id: analysis.intercom_id ? String(analysis.intercom_id) : null,
-    analyzed_at: new Date().toISOString(),
+    sentiment:    analysis.sentiment  || 'Neutral',
+    intent:       analysis.intent     || 'General',
+    summary:      analysis.summary    || '',
+    intercom_id:  analysis.intercom_id ? String(analysis.intercom_id) : null,
+    original_text: pasteText || null,
+    analyzed_at:  new Date().toISOString(),
     notes: []
   };
 

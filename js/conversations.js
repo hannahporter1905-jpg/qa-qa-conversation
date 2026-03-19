@@ -52,6 +52,7 @@ function buildConvCard(c) {
       </div>
     </div>
     <div class="conv-card-footer">
+      <button class="conv-reanalyze-btn" id="reanalyze-btn-${c.id}" onclick="reanalyzeConversation('${c.id}')">✨ Re-analyze with Notes</button>
       <button class="conv-del-btn" onclick="deleteConversation('${c.id}')">🗑 Delete</button>
     </div>`;
 
@@ -64,7 +65,8 @@ function buildNotesList(c) {
   }
   return c.notes.map(n => {
     const t = n.ts ? fmtTime(n.ts) : '';
-    return `<div class="conv-note">
+    const cls = n.system ? 'conv-note system-note' : 'conv-note';
+    return `<div class="${cls}">
       <div class="conv-note-meta"><span class="conv-note-author">${esc(n.author || 'Team')}</span><span class="conv-note-ts">${t}</span></div>
       <div class="conv-note-text">${esc(n.text)}</div>
     </div>`;
@@ -108,6 +110,69 @@ function addConvNote(cid) {
 
   input.value = '';
   toast('Note added', 'ok');
+}
+
+async function reanalyzeConversation(cid) {
+  const c = conversations.find(x => x.id === cid);
+  if (!c) return;
+
+  if (!c.notes || c.notes.length === 0) {
+    toast('Add at least one note before re-analyzing', 'i');
+    return;
+  }
+
+  const btn = document.getElementById('reanalyze-btn-' + cid);
+  if (btn) { btn.textContent = 'Analyzing…'; btn.disabled = true; }
+
+  try {
+    const notesText = c.notes
+      .filter(n => !n.system)
+      .map(n => `- ${n.author}: ${n.text}`)
+      .join('\n');
+
+    let textToSend;
+    if (c.original_text) {
+      textToSend = `${c.original_text}\n\n=== TEAM NOTES FOR IMPROVED ANALYSIS ===\n${notesText}\n\nPlease re-analyze the conversation above, taking the team notes into account to produce an improved sentiment, intent, and summary.`;
+    } else if (c.intercom_id) {
+      textToSend = `Previous analysis of Intercom conversation ${c.intercom_id}:\nSentiment: ${c.sentiment}\nIntent: ${c.intent}\nSummary: ${c.summary}\n\n=== TEAM NOTES FOR IMPROVED ANALYSIS ===\n${notesText}\n\nBased on the team's feedback, provide an improved sentiment, intent, and summary.`;
+    } else {
+      textToSend = `Previous analysis:\nSentiment: ${c.sentiment}\nIntent: ${c.intent}\nSummary: ${c.summary}\n\n=== TEAM NOTES FOR IMPROVED ANALYSIS ===\n${notesText}\n\nBased on the team's feedback, provide an improved sentiment, intent, and summary.`;
+    }
+
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: textToSend })
+    });
+
+    const contentType = response.headers.get('content-type');
+    const data = contentType?.includes('application/json') ? await response.json() : null;
+    if (!response.ok || !data) throw new Error(data?.error || 'Re-analysis failed');
+
+    const prevSentiment = c.sentiment;
+    const prevIntent = c.intent;
+
+    c.sentiment = data.sentiment || c.sentiment;
+    c.intent    = data.intent    || c.intent;
+    c.summary   = data.summary   || c.summary;
+    c.analyzed_at = new Date().toISOString();
+    c.notes.push({
+      author: 'System',
+      text: `Re-analyzed. Sentiment: ${prevSentiment} → ${c.sentiment} | Intent: ${prevIntent} → ${c.intent}`,
+      ts: new Date().toISOString(),
+      system: true
+    });
+
+    save();
+
+    const cardEl = document.getElementById('conv-' + cid);
+    if (cardEl) cardEl.replaceWith(buildConvCard(c));
+
+    toast('Re-analysis complete ✨', 'ok');
+  } catch (err) {
+    toast(err.message, 'i');
+    if (btn) { btn.textContent = '✨ Re-analyze with Notes'; btn.disabled = false; }
+  }
 }
 
 function deleteConversation(cid) {
