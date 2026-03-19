@@ -317,7 +317,7 @@ function renderOverview() {
     convItem.onclick = () => showConversations(null);
     convItem.innerHTML = `
       <div class="msn-l">
-        <div class="msn-ic">🔬</div>
+        <div class="msn-ic">🧠</div>
         <span>Conversation Analysis</span>
       </div>
       <span class="msn-pill ${conversations.length > 0 ? 'part' : ''}">${conversations.length}</span>`;
