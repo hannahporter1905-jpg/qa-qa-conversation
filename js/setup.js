@@ -256,6 +256,7 @@ function applyAnalysisToDashboard() {
 
   conversations.push(conv);
   save();
+  dbInsertConversation(conv);
   renderConversations();
   renderOverview();
   closeImportModal();
@@ -302,7 +303,7 @@ function addAnalysesToDashboard(analyses) {
     const id = 'conv-' + Date.now() + '-' + Math.random().toString(36).slice(2);
     const title = `${analysis.intent || 'General'} — ${new Date(analysis.created_at * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
-    conversations.push({
+    const newConv = {
       id,
       title,
       sentiment:     analysis.sentiment         || 'Neutral',
@@ -312,7 +313,9 @@ function addAnalysesToDashboard(analyses) {
       original_text: analysis.conversation_text || null,
       analyzed_at:   new Date(analysis.created_at * 1000).toISOString(),
       notes: []
-    });
+    };
+    conversations.push(newConv);
+    dbInsertConversation(newConv);
     added++;
   });
 

@@ -112,8 +112,10 @@ function addConvNote(cid) {
   if (!c.notes) c.notes = [];
 
   const author = localStorage.getItem('qa_user') || 'Team';
-  c.notes.push({ author, text, ts: new Date().toISOString() });
+  const note = { author, text, ts: new Date().toISOString() };
+  c.notes.push(note);
   save();
+  dbInsertConversationNote(cid, note);
 
   const notesList = document.getElementById('notes-list-' + cid);
   if (notesList) notesList.innerHTML = buildNotesList(c);
@@ -177,6 +179,9 @@ async function reanalyzeConversation(cid) {
     });
 
     save();
+    dbUpdateConversation(c);
+    const systemNote = c.notes[c.notes.length - 1];
+    dbInsertConversationNote(cid, systemNote);
 
     const cardEl = document.getElementById('conv-' + cid);
     if (cardEl) cardEl.replaceWith(buildConvCard(c));
@@ -194,6 +199,7 @@ function deleteConversation(cid) {
   if (!confirm(`Delete this conversation analysis?\n\n"${c.title.slice(0, 80)}"\n\nThis cannot be undone.`)) return;
   conversations = conversations.filter(x => x.id !== cid);
   save();
+  dbDeleteConversation(cid);
   renderConversations();
   renderOverview();
   toast('Conversation deleted', 'i');

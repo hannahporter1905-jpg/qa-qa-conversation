@@ -53,3 +53,49 @@ async function dbDeleteStage(stageId) {
     .eq('id', stageId);
   if (error) console.error('[db] deleteStage:', error.message);
 }
+
+// ── CONVERSATION DB OPERATIONS ────────────────────────────────────
+
+async function dbInsertConversation(c) {
+  if (!window.db) return;
+  const { error } = await window.db.from('conversations').insert({
+    id:            c.id,
+    title:         c.title,
+    sentiment:     c.sentiment,
+    intent:        c.intent,
+    summary:       c.summary,
+    intercom_id:   c.intercom_id || null,
+    original_text: c.original_text || null,
+    analyzed_at:   c.analyzed_at,
+  });
+  if (error) console.error('[db] insertConversation:', error.message);
+}
+
+async function dbUpdateConversation(c) {
+  if (!window.db) return;
+  const { error } = await window.db.from('conversations').update({
+    title:       c.title,
+    sentiment:   c.sentiment,
+    intent:      c.intent,
+    summary:     c.summary,
+    analyzed_at: c.analyzed_at,
+  }).eq('id', c.id);
+  if (error) console.error('[db] updateConversation:', error.message);
+}
+
+async function dbDeleteConversation(id) {
+  if (!window.db) return;
+  const { error } = await window.db.from('conversations').delete().eq('id', id);
+  if (error) console.error('[db] deleteConversation:', error.message);
+}
+
+async function dbInsertConversationNote(convId, note) {
+  if (!window.db) return;
+  const { error } = await window.db.from('conversation_notes').insert({
+    conversation_id: convId,
+    author:          note.author,
+    text:            note.text,
+    is_system:       note.system || false,
+  });
+  if (error) console.error('[db] insertConversationNote:', error.message);
+}

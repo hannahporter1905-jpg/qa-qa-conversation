@@ -29,12 +29,27 @@ async function loadState() {
           .filter(m => m.question_id === q.id)
           .map(m => ({ role: m.role, text: m.text, ts: m.created_at })),
       }));
-      console.info('[Supabase] Loaded', stages.length, 'stages,', questions.length, 'questions');
-      // Conversations are localStorage-only (no Supabase table)
-      try {
-        const lc = localStorage.getItem('qa-conv-v1');
-        if (lc) conversations = JSON.parse(lc);
-      } catch(_) {}
+      // Load conversations + their notes from Supabase
+      const [cRes, cnRes] = await Promise.all([
+        window.db.from('conversations').select('*').order('created_at'),
+        window.db.from('conversation_notes').select('*').order('created_at'),
+      ]);
+      if (!cRes.error && !cnRes.error) {
+        conversations = cRes.data.map(c => ({
+          id:            c.id,
+          title:         c.title,
+          sentiment:     c.sentiment,
+          intent:        c.intent,
+          summary:       c.summary,
+          intercom_id:   c.intercom_id,
+          original_text: c.original_text,
+          analyzed_at:   c.analyzed_at,
+          notes: cnRes.data
+            .filter(n => n.conversation_id === c.id)
+            .map(n => ({ author: n.author, text: n.text, ts: n.created_at, system: n.is_system })),
+        }));
+      }
+      console.info('[Supabase] Loaded', stages.length, 'stages,', questions.length, 'questions,', conversations.length, 'conversations');
       return;
     } catch (e) {
       console.error('[Supabase] loadState failed, falling back to localStorage:', e.message);
@@ -72,12 +87,11 @@ function initDefault() {
   }));
 }
 
-// Persists role locally; also full-saves to localStorage when Supabase is not active.
-// Conversations are always saved locally — they have no Supabase table.
+// Persists role locally; full-saves to localStorage when Supabase is not active.
 function save() {
   localStorage.setItem('qa-role', currentRole);
-  localStorage.setItem('qa-conv-v1', JSON.stringify(conversations));
   if (!window.db) {
+    localStorage.setItem('qa-conv-v1', JSON.stringify(conversations));
     localStorage.setItem(SK, JSON.stringify({ questions, stages, conversations, role: currentRole }));
   }
 }
