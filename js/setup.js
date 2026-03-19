@@ -24,9 +24,29 @@ function checkUserSession() {
     if (typeof setRole === 'function') {
       setRole(role);
     }
+    // Add the live analysis button now that we know the user is set up
+    addLiveAnalysisButton();
   } else {
     // First visit, show modal
     document.getElementById('welcome-overlay').classList.add('open');
+  }
+}
+
+function addLiveAnalysisButton() {
+  const headerRight = document.querySelector('.hdr-r');
+  if (headerRight && !document.getElementById('live-analysis-btn')) {
+      const liveButton = document.createElement('button');
+      liveButton.id = 'live-analysis-btn';
+      liveButton.className = 'btn btn-g';
+      liveButton.innerHTML = '⚡️ Analyze Recent';
+      liveButton.onclick = runLiveAnalysis;
+      
+      const addQuestionBtn = headerRight.querySelector('.btn-p');
+      if (addQuestionBtn) {
+          headerRight.insertBefore(liveButton, addQuestionBtn);
+      } else {
+          headerRight.appendChild(liveButton);
+      }
   }
 }
 
@@ -181,14 +201,14 @@ function showAnalysisResult(data) {
   const existing = document.getElementById('ai-res-box');
   if (existing) existing.remove();
 
-  // Store for application
-  window.aiAnalysisData = data.summary; // Used by applyAnalysisToDashboard
+  // Store structured data for application
+  window.aiAnalysisData = data.structuredData;
 
   const box = document.createElement('div');
   box.id = 'ai-res-box';
   box.className = 'ai-res-box';
 
-  // Display the new structured data from the analysis
+  // Display the structured data from the analysis
   const sentiment = esc(data.structuredData.sentiment || 'N/A');
   const intent = esc(data.structuredData.intent || 'N/A');
   const summary = esc(data.structuredData.summary || 'No summary provided.');
@@ -211,7 +231,8 @@ function showAnalysisResult(data) {
 }
 
 function applyAnalysisToDashboard() {
-  if (!window.aiAnalysisData) return;
+  if (!window.aiAnalysisData) return; // This is now the structured object
+  const analysis = window.aiAnalysisData;
 
   // Default to 's-ai' (Conversation Analysis) or fallback to first stage
   let targetStage = stages.find(s => s.id === 's-ai') || stages[0];
@@ -219,38 +240,108 @@ function applyAnalysisToDashboard() {
     if (typeof toast === 'function') toast('No sections available', 'i');
     return;
   }
-
+  
   const sq = questions.filter(q => q.stage === targetStage.id);
   const stIdx = stages.findIndex(s => s.id === targetStage.id);
   
   const id = `q-${targetStage.id}-${Date.now()}`;
   const num = `Q${stIdx + 1}.${sq.length + 1} (AI)`;
   const role = (typeof currentRole !== 'undefined') ? currentRole : 'admin';
-  
+
+  // Create a more descriptive title and thread message
+  const title = `Analysis: ${analysis.intent || 'General'} - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const threadText = `**Analysis Result**
+Sentiment: ${analysis.sentiment}
+Intent: ${analysis.intent}
+${analysis.intercom_id ? `Intercom ID: ${analysis.intercom_id}\n` : ''}
+**Summary:**
+${analysis.summary}`;
+
   const newQ = {
     id,
     stage: targetStage.id,
     num,
-    text: `AI Analysis: ${new Date().toLocaleTimeString()}`,
+    text: title,
     resolved: false,
-    thread: [{ role, text: window.aiAnalysisData, ts: new Date().toISOString() }]
+    thread: [{ role, text: threadText, ts: new Date().toISOString() }]
   };
 
   questions.push(newQ);
   save();
   
   if (typeof dbInsertQuestion === 'function') dbInsertQuestion(newQ);
-  if (typeof dbInsertMessage === 'function') dbInsertMessage(id, role, window.aiAnalysisData);
+  if (typeof dbInsertMessage === 'function') dbInsertMessage(id, role, threadText);
 
   renderStageBlocks();
   stages.forEach(st => renderStage(st.id));
   updateGlobal();
   updatePills();
   renderOverview();
-
+  
   closeImportModal();
-  showStage(targetStage.id);
+  showStage(targetStage.id, null);
   toast(`Added analysis to ${targetStage.label}`, 'ok');
+}
+
+async function runLiveAnalysis() {
+  const btn = document.getElementById('live-analysis-btn');
+  if (!btn) return;
+
+  const originalText = btn.innerHTML;
+  btn.innerHTML = 'Analyzing...';
+  btn.disabled = true;
+
+  try {
+    const response = await fetch('/api/analyze-recent', { method: 'POST' });
+    const data = await response.json();
+
+    if (!response.ok) throw new Error(data.error || `Live analysis failed`);
+    if (!data.analyses || data.analyses.length === 0) {
+      if (typeof toast === 'function') toast(data.message || 'No new conversations to analyze.', 'i');
+      return;
+    }
+    
+    addAnalysesToDashboard(data.analyses);
+    if (typeof toast === 'function') toast(`Added ${data.analyses.length} new analyses.`, 'ok');
+  } catch (err) {
+    console.error('Live Analysis Error:', err);
+    if (typeof toast === 'function') toast(err.message, 'i');
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
+
+function addAnalysesToDashboard(analyses) {
+  let targetStage = stages.find(s => s.id === 's-ai') || stages[0];
+  if (!targetStage) return;
+
+  const stIdx = stages.findIndex(s => s.id === targetStage.id);
+  const role = (typeof currentRole !== 'undefined') ? currentRole : 'admin';
+
+  analyses.forEach(analysis => {
+    const existing = questions.some(q => q.thread.some(t => t.text.includes(`Intercom ID: ${analysis.intercom_id}`)));
+    if (existing) return;
+
+    const sq = questions.filter(q => q.stage === targetStage.id);
+    const id = `q-${targetStage.id}-${Date.now()}-${Math.random()}`;
+    const num = `Q${stIdx + 1}.${sq.length + 1} (AI)`;
+    
+    const title = `Analysis: ${analysis.intent || 'General'} - ${new Date(analysis.created_at * 1000).toLocaleDateString()}`;
+    const threadText = `**Analysis Result**\nSentiment: ${analysis.sentiment}\nIntent: ${analysis.intent}\nIntercom ID: ${analysis.intercom_id}\n\n**Summary:**\n${analysis.summary}`;
+
+    const newQ = { id, stage: targetStage.id, num, text: title, resolved: false, thread: [{ role, text: threadText, ts: new Date().toISOString() }] };
+
+    questions.push(newQ);
+    if (typeof dbInsertQuestion === 'function') dbInsertQuestion(newQ);
+    if (typeof dbInsertMessage === 'function') dbInsertMessage(id, role, threadText);
+  });
+
+  renderStage(targetStage.id);
+  updateGlobal();
+  updatePills();
+  renderOverview();
+  showStage(targetStage.id, null);
 }
 
 async function runAnalysis() {

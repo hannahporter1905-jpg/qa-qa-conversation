@@ -104,6 +104,9 @@ export default async function handler(req, res) {
     }
 
     const analysis = JSON.parse(jsonMatch[0]);
+    if (intercomId) {
+      analysis.intercom_id = intercomId;
+    }
     return res.status(200).json(analysis);
   } catch (error) {
     console.error('Analysis Error:', error);
