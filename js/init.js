@@ -20,6 +20,10 @@ document.getElementById('stage-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('stage-overlay')) closeStageModal();
 });
 
+document.getElementById('run-analyze-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('run-analyze-overlay')) closeRunAnalyzeModal();
+});
+
 // ── BOOT (async to support Supabase) ─────────────────────────────
 
 (async function boot() {

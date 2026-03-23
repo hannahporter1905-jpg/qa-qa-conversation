@@ -117,7 +117,7 @@
           <div class="s-ti">Conversation Analysis</div>
           <div class="s-sub">AI-analyzed conversations — uses the active prompt from Prompt Library</div>
         </div>
-        <button class="btn btn-p" onclick="openImportModal()">✨ Run Analyze</button>
+        <button class="btn btn-p" onclick="openRunAnalyzeModal()">✨ Run Analyze</button>
       </div>
       <div id="conv-list"></div>
     </div>
@@ -284,6 +284,32 @@
       <button class="btn btn-g" onclick="closeStageModal()">Cancel</button>
       <button class="btn btn-p" onclick="addStage()">Add Section</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Run Analyze Modal ──────────────────────────────────────── -->
+<div class="add-overlay" id="run-analyze-overlay">
+  <div class="add-modal" style="width:640px;max-width:96vw">
+    <div class="add-title">✨ Run Analyze</div>
+    <p class="ra-subtitle">Test your prompt against a conversation. Results are <strong>not saved</strong> to the dashboard.</p>
+
+    <div class="ra-prompt-bar" id="ra-prompt-bar">
+      <span class="ra-prompt-label">Active prompt:</span>
+      <span class="ra-prompt-name" id="ra-prompt-name">—</span>
+      <button class="ra-edit-link" onclick="closeRunAnalyzeModal();showPromptLibrary(null)">Edit Prompt →</button>
+    </div>
+
+    <div class="frow">
+      <label class="flbl">Paste Conversation</label>
+      <textarea class="fta" id="ra-text" placeholder="Paste the full conversation transcript here…" style="min-height:160px;font-family:monospace;font-size:12px"></textarea>
+    </div>
+
+    <div class="modal-btns" style="margin-bottom:0">
+      <button class="btn btn-g" onclick="closeRunAnalyzeModal()">Cancel</button>
+      <button class="btn btn-p" id="ra-run-btn" onclick="runPromptTest()">▶ Analyze</button>
+    </div>
+
+    <div id="ra-result" class="ra-result" style="display:none"></div>
   </div>
 </div>
 
