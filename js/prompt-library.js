@@ -424,8 +424,9 @@ function _autoRerunIfConvSelected() {
 
 // ── PROMPT QUICK MODAL (from Conversation Analysis) ────────────────
 
-let _promptModalSelectedId = null; // id of prompt selected in the modal dropdown
+let _promptModalSelectedId = null;  // id of prompt selected in the modal dropdown
 let _promptModalRunSelected = false; // true when opened from "Run QA on Selected"
+let _promptModalConvId = null;       // single conv id when opened from a conversation card
 
 function openPromptModal(opts) {
   const overlay = document.getElementById('prompt-modal-overlay');
@@ -433,6 +434,7 @@ function openPromptModal(opts) {
   if (!overlay || !ta) return;
 
   _promptModalRunSelected = !!(opts && opts.runSelected);
+  _promptModalConvId      = (opts && opts.convId) || null;
 
   const active = getActivePrompt();
   _promptModalSelectedId = active.id;
@@ -448,6 +450,9 @@ function openPromptModal(opts) {
     const count = typeof _selectedConvIds !== 'undefined' ? _selectedConvIds.size : 0;
     if (titleEl) titleEl.textContent = '📝 Select Prompt & Analyze';
     if (analyzeBtn) analyzeBtn.textContent = `▶ Analyze Selected (${count})`;
+  } else if (_promptModalConvId) {
+    if (titleEl) titleEl.textContent = '📝 View / Edit Prompt';
+    if (analyzeBtn) analyzeBtn.textContent = '▶ Analyze this Conversation';
   } else {
     if (titleEl) titleEl.textContent = '📝 View / Edit Prompt';
     if (analyzeBtn) analyzeBtn.textContent = '▶ Analyze with this Prompt';
@@ -509,6 +514,14 @@ function runQAFromPromptModal() {
     return;
   }
 
+  if (_promptModalConvId && typeof runAnalysisOnConv === 'function') {
+    // Launched from a conversation card — close modal and analyze that one conversation
+    const cid = _promptModalConvId;
+    closePromptModal();
+    runAnalysisOnConv(cid, content);
+    return;
+  }
+
   // Default: open run-analyze modal to pick a single conversation
   _raCustomPromptContent = content;
   closePromptModal();
@@ -519,6 +532,7 @@ function closePromptModal() {
   const overlay = document.getElementById('prompt-modal-overlay');
   if (overlay) overlay.classList.remove('open');
   _promptModalRunSelected = false;
+  _promptModalConvId = null;
 }
 
 function savePromptModal() {

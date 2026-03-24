@@ -74,7 +74,7 @@ function buildConvCard(c) {
       <div class="conv-card-footer">
         <span class="conv-view-hint">${c.original_text ? '📄 Click to view & analyze' : '📄 Click to view'}</span>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-g btn-sm" style="font-size:11px;padding:3px 10px" onclick="event.stopPropagation();openPromptModal()">📝 View Prompt</button>
+          <button class="btn btn-g btn-sm" style="font-size:11px;padding:3px 10px" onclick="event.stopPropagation();openPromptModal({convId:'${c.id}'})">📝 View Prompt</button>
           <button class="conv-del-btn" onclick="event.stopPropagation();deleteConversation('${c.id}')">🗑 Delete</button>
         </div>
       </div>
@@ -110,6 +110,55 @@ function _updateBulkBar() {
     btn.textContent = `▶ Run QA on Selected (${_selectedConvIds.size})`;
   } else {
     btn.style.display = 'none';
+  }
+}
+
+async function runAnalysisOnConv(cid, promptContent) {
+  const c = conversations.find(x => x.id === cid);
+  if (!c || !c.original_text) { toast('No transcript available to analyze', 'i'); return; }
+
+  toast('Analyzing…', 'i');
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: c.original_text, customSystemPrompt: promptContent })
+    });
+    const ct = response.headers.get('content-type');
+    const data = ct?.includes('application/json') ? await response.json() : null;
+    if (!response.ok || !data) throw new Error(data?.error || 'Analysis failed');
+
+    const prev = { sentiment: c.sentiment, intent: c.intent };
+    c.sentiment                = data.sentiment                || c.sentiment;
+    c.intent                   = data.intent                   || c.intent;
+    c.summary                  = data.summary                  || c.summary;
+    c.dissatisfaction_severity = data.dissatisfaction_severity || c.dissatisfaction_severity;
+    c.issue_category           = data.issue_category           || c.issue_category;
+    c.resolution_status        = data.resolution_status        || c.resolution_status;
+    c.language                 = data.language                 || c.language;
+    c.agent_performance_score  = data.agent_performance_score  ?? c.agent_performance_score;
+    c.agent_performance_notes  = data.agent_performance_notes  || c.agent_performance_notes;
+    c.key_quotes               = data.key_quotes               || c.key_quotes;
+    c.recommended_action       = data.recommended_action       || c.recommended_action;
+    c.is_alert_worthy          = data.is_alert_worthy          ?? c.is_alert_worthy;
+    c.alert_reason             = data.alert_reason             || c.alert_reason;
+    c.analyzed_at              = new Date().toISOString();
+
+    if (!c.notes) c.notes = [];
+    c.notes.push({
+      author: 'System',
+      text: `Re-analyzed via View Prompt. Sentiment: ${prev.sentiment} → ${c.sentiment}`,
+      ts: new Date().toISOString(),
+      system: true
+    });
+
+    save();
+    dbUpdateConversation(c);
+    renderConversations();
+    renderOverview();
+    toast('Analysis updated ✨', 'ok');
+  } catch (err) {
+    toast(err.message, 'i');
   }
 }
 
