@@ -240,6 +240,7 @@ function useHistoryPrompt(id) {
 
 let _raSelectedId = null;
 let _raLastSelectedId = null; // persists after modal close — used for auto-rerun on prompt save
+let _raCustomPromptContent = null; // set when launching from the View Prompt modal
 
 function openRunAnalyzeModal(preSelectId) {
   const overlay = document.getElementById('run-analyze-overlay');
@@ -248,9 +249,9 @@ function openRunAnalyzeModal(preSelectId) {
   _raSelectedId = preSelectId || null;
   if (_raSelectedId) _raLastSelectedId = _raSelectedId;
 
-  // Show active prompt name
+  // Show active prompt name (or custom if launched from View Prompt modal)
   const nameEl = document.getElementById('ra-prompt-name');
-  if (nameEl) nameEl.textContent = getActivePrompt().name || 'Default QA Prompt';
+  if (nameEl) nameEl.textContent = _raCustomPromptContent ? 'Custom (from View Prompt)' : (getActivePrompt().name || 'Default QA Prompt');
 
   // Reset result
   const resultEl = document.getElementById('ra-result');
@@ -325,6 +326,7 @@ function closeRunAnalyzeModal() {
   const overlay = document.getElementById('run-analyze-overlay');
   if (overlay) overlay.classList.remove('open');
   _raSelectedId = null;
+  _raCustomPromptContent = null;
 }
 
 async function runPromptTest() {
@@ -340,7 +342,7 @@ async function runPromptTest() {
   if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
 
   try {
-    const payload = { text: c.original_text, customSystemPrompt: getActivePrompt().content };
+    const payload = { text: c.original_text, customSystemPrompt: _raCustomPromptContent || getActivePrompt().content };
 
     const response = await fetch('/api/analyze', {
       method: 'POST',
@@ -422,18 +424,72 @@ function _autoRerunIfConvSelected() {
 
 // ── PROMPT QUICK MODAL (from Conversation Analysis) ────────────────
 
+let _promptModalSelectedId = null; // id of prompt selected in the modal dropdown
+
 function openPromptModal() {
   const overlay = document.getElementById('prompt-modal-overlay');
   const ta = document.getElementById('prompt-modal-ta');
-  const nameEl = document.getElementById('prompt-modal-name');
   if (!overlay || !ta) return;
 
   const active = getActivePrompt();
-  if (nameEl) nameEl.textContent = active.name;
+  _promptModalSelectedId = active.id;
+
+  _populatePromptModalSelect();
   ta.value = active.content;
 
   overlay.classList.add('open');
   setTimeout(() => ta.focus(), 60);
+}
+
+function _populatePromptModalSelect() {
+  const sel = document.getElementById('prompt-modal-select');
+  const badge = document.getElementById('prompt-modal-active-badge');
+  if (!sel) return;
+
+  const sorted = _prompts.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  sel.innerHTML = sorted.map(p => {
+    const label = p.is_active ? `✓ ${p.name} (Active)` : p.name;
+    return `<option value="${p.id}"${p.id === _promptModalSelectedId ? ' selected' : ''}>${label}</option>`;
+  }).join('');
+
+  if (badge) {
+    const sel_prompt = _prompts.find(p => p.id === _promptModalSelectedId);
+    badge.textContent = sel_prompt?.is_active ? 'Active' : 'History';
+    badge.style.color = sel_prompt?.is_active ? 'var(--green)' : 'var(--accent)';
+    badge.style.background = sel_prompt?.is_active ? 'rgba(34,197,94,.1)' : 'rgba(79,142,247,.12)';
+    badge.style.borderColor = sel_prompt?.is_active ? 'rgba(34,197,94,.2)' : 'rgba(79,142,247,.25)';
+  }
+}
+
+function promptModalSelectChange() {
+  const sel = document.getElementById('prompt-modal-select');
+  const ta = document.getElementById('prompt-modal-ta');
+  if (!sel || !ta) return;
+
+  _promptModalSelectedId = sel.value;
+  const chosen = _prompts.find(p => p.id === sel.value);
+  if (chosen) ta.value = chosen.content;
+
+  const badge = document.getElementById('prompt-modal-active-badge');
+  if (badge) {
+    badge.textContent = chosen?.is_active ? 'Active' : 'History';
+    badge.style.color = chosen?.is_active ? 'var(--green)' : 'var(--accent)';
+    badge.style.background = chosen?.is_active ? 'rgba(34,197,94,.1)' : 'rgba(79,142,247,.12)';
+    badge.style.borderColor = chosen?.is_active ? 'rgba(34,197,94,.2)' : 'rgba(79,142,247,.25)';
+  }
+}
+
+function runQAFromPromptModal() {
+  const ta = document.getElementById('prompt-modal-ta');
+  if (!ta) return;
+  const content = ta.value.trim();
+  if (!content) { toast('Prompt cannot be empty', 'i'); return; }
+
+  // Store the content from the modal as the override for the upcoming test
+  _raCustomPromptContent = content;
+  closePromptModal();
+  openRunAnalyzeModal();
 }
 
 function closePromptModal() {
@@ -477,6 +533,7 @@ function showPromptLibrary(navEl) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const t = navEl || document.querySelector('.nav-item[data-stage="prompts"]');
   if (t) t.classList.add('active');
+  renderPromptLibrary();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (window.innerWidth <= 768) closeSidebar();
 }

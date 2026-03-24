@@ -383,6 +383,7 @@ function showConversations(navEl) {
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   const t = navEl || document.querySelector('.nav-item[data-stage="conversations"]');
   if (t) t.classList.add('active');
+  renderConversations();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (window.innerWidth <= 768) closeSidebar();
 }
