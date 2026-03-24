@@ -112,11 +112,77 @@ function _updateBulkBar() {
 
 function runQAOnSelected() {
   if (_selectedConvIds.size === 0) return;
-  const firstId = [..._selectedConvIds][0];
-  // Pre-select in the Run QA modal
-  if (typeof openRunAnalyzeModal === 'function') {
-    openRunAnalyzeModal(firstId);
+  // Open the prompt modal directly — user picks/edits the prompt, then clicks Analyze
+  if (typeof openPromptModal === 'function') {
+    openPromptModal({ runSelected: true });
   }
+}
+
+async function runAnalysisOnSelectedConvs(promptContent) {
+  const ids = [..._selectedConvIds];
+  if (ids.length === 0) return;
+
+  const eligible = ids.filter(cid => {
+    const c = conversations.find(x => x.id === cid);
+    return c && c.original_text;
+  });
+
+  if (eligible.length === 0) {
+    toast('None of the selected conversations have a transcript to analyze', 'i');
+    return;
+  }
+
+  toast(`Analyzing ${eligible.length} conversation${eligible.length > 1 ? 's' : ''}…`, 'i');
+
+  let completed = 0;
+  for (const cid of eligible) {
+    const c = conversations.find(x => x.id === cid);
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: c.original_text, customSystemPrompt: promptContent })
+      });
+      const ct = response.headers.get('content-type');
+      const data = ct?.includes('application/json') ? await response.json() : null;
+      if (!response.ok || !data) throw new Error(data?.error || 'Analysis failed');
+
+      const prev = { sentiment: c.sentiment, intent: c.intent };
+      c.sentiment                = data.sentiment                || c.sentiment;
+      c.intent                   = data.intent                   || c.intent;
+      c.summary                  = data.summary                  || c.summary;
+      c.dissatisfaction_severity = data.dissatisfaction_severity || c.dissatisfaction_severity;
+      c.issue_category           = data.issue_category           || c.issue_category;
+      c.resolution_status        = data.resolution_status        || c.resolution_status;
+      c.language                 = data.language                 || c.language;
+      c.agent_performance_score  = data.agent_performance_score  ?? c.agent_performance_score;
+      c.agent_performance_notes  = data.agent_performance_notes  || c.agent_performance_notes;
+      c.key_quotes               = data.key_quotes               || c.key_quotes;
+      c.recommended_action       = data.recommended_action       || c.recommended_action;
+      c.is_alert_worthy          = data.is_alert_worthy          ?? c.is_alert_worthy;
+      c.alert_reason             = data.alert_reason             || c.alert_reason;
+      c.analyzed_at              = new Date().toISOString();
+
+      if (!c.notes) c.notes = [];
+      c.notes.push({
+        author: 'System',
+        text: `Bulk re-analyzed. Sentiment: ${prev.sentiment} → ${c.sentiment}`,
+        ts: new Date().toISOString(),
+        system: true
+      });
+
+      dbUpdateConversation(c);
+      completed++;
+    } catch (err) {
+      console.error('[runAnalysisOnSelectedConvs] failed for', cid, err.message);
+    }
+  }
+
+  save();
+  _selectedConvIds.clear();
+  renderConversations();
+  renderOverview();
+  toast(`${completed} of ${eligible.length} conversation${eligible.length > 1 ? 's' : ''} analyzed ✨`, 'ok');
 }
 
 // ── DETAIL VIEW ────────────────────────────────────────────────────

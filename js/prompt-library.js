@@ -425,17 +425,33 @@ function _autoRerunIfConvSelected() {
 // ── PROMPT QUICK MODAL (from Conversation Analysis) ────────────────
 
 let _promptModalSelectedId = null; // id of prompt selected in the modal dropdown
+let _promptModalRunSelected = false; // true when opened from "Run QA on Selected"
 
-function openPromptModal() {
+function openPromptModal(opts) {
   const overlay = document.getElementById('prompt-modal-overlay');
   const ta = document.getElementById('prompt-modal-ta');
   if (!overlay || !ta) return;
+
+  _promptModalRunSelected = !!(opts && opts.runSelected);
 
   const active = getActivePrompt();
   _promptModalSelectedId = active.id;
 
   _populatePromptModalSelect();
   ta.value = active.content;
+
+  // Update title and analyze button based on context
+  const titleEl = overlay.querySelector('.add-title');
+  const analyzeBtn = document.getElementById('prompt-modal-analyze-btn');
+
+  if (_promptModalRunSelected) {
+    const count = typeof _selectedConvIds !== 'undefined' ? _selectedConvIds.size : 0;
+    if (titleEl) titleEl.textContent = '📝 Select Prompt & Analyze';
+    if (analyzeBtn) analyzeBtn.textContent = `▶ Analyze Selected (${count})`;
+  } else {
+    if (titleEl) titleEl.textContent = '📝 View / Edit Prompt';
+    if (analyzeBtn) analyzeBtn.textContent = '▶ Analyze with this Prompt';
+  }
 
   overlay.classList.add('open');
   setTimeout(() => ta.focus(), 60);
@@ -486,7 +502,14 @@ function runQAFromPromptModal() {
   const content = ta.value.trim();
   if (!content) { toast('Prompt cannot be empty', 'i'); return; }
 
-  // Store the content from the modal as the override for the upcoming test
+  if (_promptModalRunSelected && typeof runAnalysisOnSelectedConvs === 'function') {
+    // Launched from "Run QA on Selected" — close modal and bulk-analyze
+    closePromptModal();
+    runAnalysisOnSelectedConvs(content);
+    return;
+  }
+
+  // Default: open run-analyze modal to pick a single conversation
   _raCustomPromptContent = content;
   closePromptModal();
   openRunAnalyzeModal();
@@ -495,6 +518,7 @@ function runQAFromPromptModal() {
 function closePromptModal() {
   const overlay = document.getElementById('prompt-modal-overlay');
   if (overlay) overlay.classList.remove('open');
+  _promptModalRunSelected = false;
 }
 
 function savePromptModal() {
